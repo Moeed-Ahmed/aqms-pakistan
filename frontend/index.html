@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AQMS Pakistan — Air Quality Monitor</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<!-- ══════════════════════════ HEADER -->
+<header class="header">
+  <div class="header-brand">
+    <div class="brand-icon">
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </div>
+    <div>
+      <span class="brand-title">AQMS <span class="brand-country">Pakistan</span></span>
+      <span class="brand-sub">Air Quality Monitoring System</span>
+    </div>
+  </div>
+
+  <div class="header-status">
+    <div class="live-dot"></div>
+    <span class="live-label">LIVE</span>
+    <span class="last-update" id="lastUpdate">—</span>
+  </div>
+
+  <div class="header-controls">
+    <button class="hbtn" id="toggleSidebar" title="Toggle Sidebar">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <button class="hbtn" id="toggleTheme" title="Day/Night Mode">
+      <svg viewBox="0 0 24 24" fill="none" id="themeIcon"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" fill="currentColor"/></svg>
+    </button>
+    <button class="hbtn" id="refreshBtn" title="Refresh Data">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M1 4v6h6M23 20v-6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 013.51 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- ══════════════════════════ MAIN -->
+<main class="main-layout">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar" id="sidebar">
+
+    <!-- LAYERS -->
+    <section class="panel">
+      <div class="panel-header open" data-panel="layersPanel">
+        <span>🗂 Layers</span><span class="chevron">▾</span>
+      </div>
+      <div class="panel-body" id="layersPanel">
+        <label class="toggle-row"><input type="checkbox" id="layerPM25" checked><span>PM2.5 Markers</span></label>
+        <label class="toggle-row"><input type="checkbox" id="layerPM10"><span>PM10 Markers</span></label>
+        <label class="toggle-row"><input type="checkbox" id="layerHeat" checked><span>AQI Heatmap</span></label>
+        <label class="toggle-row"><input type="checkbox" id="layerWind" checked><span>Wind Animation</span></label>
+        <label class="toggle-row"><input type="checkbox" id="layerDisasters" checked><span>Disaster Alerts</span></label>
+        <label class="toggle-row"><input type="checkbox" id="layerClouds"><span>Satellite Overlay</span></label>
+      </div>
+    </section>
+
+    <!-- BASE MAP -->
+    <section class="panel">
+      <div class="panel-header open" data-panel="basemapPanel">
+        <span>🗺 Base Map</span><span class="chevron">▾</span>
+      </div>
+      <div class="panel-body" id="basemapPanel">
+        <div class="tile-options">
+          <button class="tile-btn active" data-tile="dark">Dark</button>
+          <button class="tile-btn" data-tile="light">Light</button>
+          <button class="tile-btn" data-tile="terrain">Terrain</button>
+          <button class="tile-btn" data-tile="satellite">Satellite</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- LOCATION INFO (populated on click) -->
+    <section class="panel" id="locationPanel" style="display:none">
+      <div class="panel-header open">
+        <span>📍 <span id="locationName">—</span></span>
+        <span class="data-src-badge" id="dataSrc"></span>
+      </div>
+      <div class="panel-body loc-body">
+
+        <!-- BIG AQI -->
+        <div class="aqi-badge-large" id="aqiBadge">
+          <div class="aqi-value" id="aqiValue">—</div>
+          <div class="aqi-sublabel">AQI</div>
+          <div class="aqi-cat" id="aqiCat">—</div>
+        </div>
+
+        <!-- PM HERO — most prominent -->
+        <div class="pm-hero-row">
+          <div class="pm-hero-card" id="pm25Card">
+            <div class="pm-tag">PM<sub>2.5</sub></div>
+            <div class="pm-big" id="infoPM25">—</div>
+            <div class="pm-unit">µg/m³</div>
+            <div class="pm-bar-wrap"><div class="pm-bar-fill" id="pm25Bar" style="width:0%;background:#38c9f0"></div></div>
+          </div>
+          <div class="pm-hero-card" id="pm10Card">
+            <div class="pm-tag">PM<sub>10</sub></div>
+            <div class="pm-big" id="infoPM10">—</div>
+            <div class="pm-unit">µg/m³</div>
+            <div class="pm-bar-wrap"><div class="pm-bar-fill" id="pm10Bar" style="width:0%;background:#f09938"></div></div>
+          </div>
+        </div>
+
+        <!-- DOMINANT POLLUTANT -->
+        <div class="dom-row" id="domRow" style="display:none">
+          <span class="dom-label">Dominant</span>
+          <span class="dom-val" id="domVal">—</span>
+        </div>
+
+        <!-- POLLUTANTS GRID -->
+        <div class="section-sep">🧪 Other Pollutants</div>
+        <div class="pol-grid">
+          <div class="pol-card">
+            <div class="pol-name">NO₂</div>
+            <div class="pol-val" id="infoNO2">—</div>
+            <div class="pol-unit">µg/m³</div>
+          </div>
+          <div class="pol-card">
+            <div class="pol-name">O₃</div>
+            <div class="pol-val" id="infoO3">—</div>
+            <div class="pol-unit">µg/m³</div>
+          </div>
+          <div class="pol-card">
+            <div class="pol-name">SO₂</div>
+            <div class="pol-val" id="infoSO2">—</div>
+            <div class="pol-unit">µg/m³</div>
+          </div>
+          <div class="pol-card">
+            <div class="pol-name">CO</div>
+            <div class="pol-val" id="infoCO">—</div>
+            <div class="pol-unit">ppm</div>
+          </div>
+        </div>
+
+        <!-- WEATHER -->
+        <div class="section-sep">🌤 Live Weather</div>
+        <div class="weather-main-row">
+          <div class="wx-temp-block">
+            <div class="wx-big-temp" id="infoTemp">—</div>
+            <div class="wx-feels">Feels <span id="infoFeels">—</span></div>
+          </div>
+          <div class="wx-desc-block">
+            <div class="wx-emoji" id="weatherIcon">🌤</div>
+            <div class="wx-desc" id="weatherDesc">—</div>
+          </div>
+        </div>
+        <div class="wx-grid">
+          <div class="wx-item">
+            <div class="wx-ico">💧</div>
+            <div class="wx-v" id="infoHumidity">—</div>
+            <div class="wx-l">Humidity</div>
+          </div>
+          <div class="wx-item">
+            <div class="wx-ico">💨</div>
+            <div class="wx-v" id="infoWind">—</div>
+            <div class="wx-l">Wind</div>
+          </div>
+          <div class="wx-item">
+            <div class="wx-ico">☁️</div>
+            <div class="wx-v" id="infoClouds">—</div>
+            <div class="wx-l">Cloud</div>
+          </div>
+          <div class="wx-item">
+            <div class="wx-ico">🌧</div>
+            <div class="wx-v" id="infoRain">—</div>
+            <div class="wx-l">Rain</div>
+          </div>
+          <div class="wx-item">
+            <div class="wx-ico">📊</div>
+            <div class="wx-v" id="infoPressure">—</div>
+            <div class="wx-l">Pressure</div>
+          </div>
+          <div class="wx-item">
+            <div class="wx-ico">🧭</div>
+            <div class="wx-v" id="infoWindDir">—</div>
+            <div class="wx-l">Direction</div>
+          </div>
+        </div>
+
+        <!-- DISASTERS -->
+        <div class="disaster-box" id="disasterBox" style="display:none">
+          <div class="dis-hdr">⚠️ Alerts Nearby</div>
+          <div id="disasterList"></div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- NATIONAL STATS -->
+    <section class="panel">
+      <div class="panel-header open" data-panel="statsPanel">
+        <span>📊 National Overview</span><span class="chevron">▾</span>
+      </div>
+      <div class="panel-body" id="statsPanel">
+        <div class="stat-row"><span>Stations Online</span><span class="stat-val" id="statCount">—</span></div>
+        <div class="stat-row"><span>Avg PM2.5</span><span class="stat-val" id="statAvgPM25">—</span></div>
+        <div class="stat-row"><span>Most Polluted</span><span class="stat-val stat-bad" id="statWorst">—</span></div>
+        <div class="stat-row"><span>Cleanest City</span><span class="stat-val stat-good" id="statBest">—</span></div>
+        <div class="stat-row"><span>Active Alerts</span><span class="stat-val" id="statAlerts">—</span></div>
+        <div class="stat-row"><span>Data Source</span><span class="stat-val" style="color:var(--accent3)">WAQI + Open-Meteo</span></div>
+      </div>
+    </section>
+
+    <!-- AQI LEGEND -->
+    <section class="panel">
+      <div class="panel-header" data-panel="legendPanel">
+        <span>🎨 AQI Scale</span><span class="chevron">▾</span>
+      </div>
+      <div class="panel-body collapsed" id="legendPanel">
+        <div class="legend-bar-wrap">
+          <div class="legend-bar"></div>
+          <div class="legend-ticks">
+            <span>0</span><span>50</span><span>100</span><span>150</span><span>200</span><span>300+</span>
+          </div>
+        </div>
+        <div class="legend-item"><span class="leg-dot" style="background:#00e400"></span><b>Good</b> — 0–50</div>
+        <div class="legend-item"><span class="leg-dot" style="background:#ffff00"></span><b>Moderate</b> — 51–100</div>
+        <div class="legend-item"><span class="leg-dot" style="background:#ff7e00"></span><b>Unhealthy (Sensitive)</b> — 101–150</div>
+        <div class="legend-item"><span class="leg-dot" style="background:#ff0000"></span><b>Unhealthy</b> — 151–200</div>
+        <div class="legend-item"><span class="leg-dot" style="background:#8f3f97"></span><b>Very Unhealthy</b> — 201–300</div>
+        <div class="legend-item"><span class="leg-dot" style="background:#7e0023"></span><b>Hazardous</b> — 301+</div>
+      </div>
+    </section>
+
+    <!-- INFO panels -->
+    <section class="panel info-panel">
+      <div class="panel-header" data-panel="infoPM25sec"><span>ℹ️ What is PM2.5?</span><span class="chevron">▾</span></div>
+      <div class="panel-body collapsed" id="infoPM25sec">
+        <p class="info-text">Fine particles ≤ 2.5µm — 30× thinner than a human hair. They penetrate deep into lungs and bloodstream.</p>
+        <div class="info-tag danger">Health Risk</div>
+        <p class="info-text">Causes heart disease, lung cancer, stroke, respiratory illness. WHO safe limit: <b>15 µg/m³</b> annual mean. Pakistan averages 5–8× this limit in major cities.</p>
+        <div class="info-tag cause">Main Sources</div>
+        <p class="info-text">Vehicle exhaust, brick kilns, crop burning (Oct–Nov), industrial emissions, temperature inversions trapping smog.</p>
+        <div class="info-tag prevent">Prevention</div>
+        <p class="info-text">N95 masks when AQI > 100, HEPA air purifiers indoors, avoid outdoor exercise on bad days.</p>
+      </div>
+    </section>
+    <section class="panel info-panel">
+      <div class="panel-header" data-panel="infoPM10sec"><span>ℹ️ What is PM10?</span><span class="chevron">▾</span></div>
+      <div class="panel-body collapsed" id="infoPM10sec">
+        <p class="info-text">Coarser particles ≤ 10µm (dust, pollen, mould). WHO limit: <b>45 µg/m³</b> annual mean.</p>
+        <div class="info-tag cause">Sources</div>
+        <p class="info-text">Road dust, Balochistan desert winds, demolition, agricultural harvesting, cement industries.</p>
+        <div class="info-tag prevent">Tip</div>
+        <p class="info-text">Keep windows closed during dust storms (especially May–Jun in Sindh and summer in Balochistan).</p>
+      </div>
+    </section>
+    <section class="panel info-panel">
+      <div class="panel-header" data-panel="infoDisSec"><span>⚠️ Disaster Risks</span><span class="chevron">▾</span></div>
+      <div class="panel-body collapsed" id="infoDisSec">
+        <p class="info-text"><b>🌊 Floods</b> — Monsoon (Jul–Sep) annual. 2022 floods submerged 1/3 of the country.</p>
+        <p class="info-text"><b>⚡ Earthquakes</b> — Balochistan and KPK on active fault lines.</p>
+        <p class="info-text"><b>⛰️ Landslides</b> — GB, AJK, KPK hills after heavy rain.</p>
+        <p class="info-text"><b>🌀 Cyclones</b> — Arabian Sea, threat to Karachi coast (Oct–Nov).</p>
+        <p class="info-text"><b>☀️ Drought</b> — Thar Desert and arid Balochistan water stress.</p>
+      </div>
+    </section>
+    <section class="panel info-panel">
+      <div class="panel-header" data-panel="infoWindSec"><span>💨 Wind & Smog</span><span class="chevron">▾</span></div>
+      <div class="panel-body collapsed" id="infoWindSec">
+        <p class="info-text">Wind particles show real-time flow from Open-Meteo. Strong winds disperse PM2.5; calm winter conditions create temperature inversions trapping pollution — main cause of Lahore's Oct–Jan smog crisis.</p>
+        <p class="info-text">Monsoon winds arrive from the Bay of Bengal (Jul–Sep). Dry westerlies dominate Oct–Mar.</p>
+      </div>
+    </section>
+
+  </aside>
+
+  <!-- ── MAP AREA ── -->
+  <div class="map-wrapper">
+    <div id="map"></div>
+    <canvas id="windCanvas"></canvas>
+
+    <div class="map-loading" id="mapLoading">
+      <div class="spinner"></div><span>Loading live data…</span>
+    </div>
+
+    <div class="coord-display" id="coordDisplay">30.3753°N 69.3451°E</div>
+    <div class="click-hint" id="clickHint">👆 Click anywhere for live data</div>
+  </div>
+
+</main>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
