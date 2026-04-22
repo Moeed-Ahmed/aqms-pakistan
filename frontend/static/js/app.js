@@ -81,7 +81,7 @@ class AQMS {
     this.windCanvas  = null;
     this.windCtx     = null;
     this.particles   = [];
-    this.windVisible = true;
+    this.windVisible = false;
     this.windBaseU   = 1.0;   // m/s east component (fallback)
     this.windBaseV   = 0.3;   // m/s north component
 
