@@ -673,4 +673,6 @@ if __name__ == '__main__':
     print("  Check DB is filling:  http://localhost:5000/api/db-stats")
     print("  Live data test:       http://localhost:5000/api/waqi?lat=31.55&lon=74.34")
     print("=" * 58)
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    import os
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, host='0.0.0.0', port=port)
