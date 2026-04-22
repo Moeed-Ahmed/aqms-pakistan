@@ -117,6 +117,41 @@ def get_db():
     except Exception as e:
         log.debug(f"DB unavailable: {e}")
         return None
+def cleanup_old_data():
+    """Keep only last 7 days of data to control DB size."""
+    conn = get_db()
+    if not conn:
+        return
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            DELETE FROM air_quality_readings
+            WHERE recorded_at < NOW() - INTERVAL '7 days'
+        """)
+        aq_deleted = cur.rowcount
+
+        cur.execute("""
+            DELETE FROM weather_readings
+            WHERE recorded_at < NOW() - INTERVAL '7 days'
+        """)
+        wx_deleted = cur.rowcount
+
+        cur.execute("""
+            DELETE FROM data_log
+            WHERE fetched_at < NOW() - INTERVAL '3 days'
+        """)
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        log.info(f"Cleanup: removed {aq_deleted} AQ rows, {wx_deleted} WX rows")
+    except Exception as e:
+        log.error(f"Cleanup error: {e}")
+        try:
+            conn.rollback()
+            conn.close()
+        except:
+            pass
 
 # ── WAQI fetch + parse ────────────────────────────────────────
 def waqi_fetch(lat, lon):
@@ -344,6 +379,12 @@ def get_stations():
         except: pass
 
     log.info(f"/api/stations: {len(result)} stations | WAQI={waqi_hits} Demo={demo_hits}")
+
+    # Cleanup old data — runs roughly once every 2 hours
+    # At 3-min fetches: 1 in 40 chance = triggers ~once per 2 hrs
+    if random.randint(1, 40) == 1:
+        cleanup_old_data()
+
     return jsonify(result)
 
 # ── /api/waqi (single point, for map click) ───────────────────
