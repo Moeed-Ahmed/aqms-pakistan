@@ -112,10 +112,17 @@ def aqi_cat(aqi):
 # ── DB helper ─────────────────────────────────────────────────
 def get_db():
     try:
-        conn = psycopg2.connect(**DB_CONFIG)
+        conn = psycopg2.connect(
+            dbname=os.getenv("DB_NAME", "postgres"),
+            user=os.getenv("DB_USER", "postgres"),
+            password=os.getenv("DB_PASSWORD", ""),
+            host=os.getenv("DB_HOST", "localhost"),
+            port=os.getenv("DB_PORT", "5432"),
+            sslmode="require"
+        )
         return conn
     except Exception as e:
-        log.debug(f"DB unavailable: {e}")
+        log.error(f"DB connection failed: {e}")
         return None
 def cleanup_old_data():
     """Keep only last 7 days of data to control DB size."""
