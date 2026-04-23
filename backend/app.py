@@ -15,7 +15,7 @@ from datetime import datetime
 
 load_dotenv()  # auto-loads backend/.env
 
-app = Flask(__name__, template_folder='../frontend', static_folder='../frontend/static')
+app = Flask(__name__)
 CORS(app)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 log = logging.getLogger(__name__)
